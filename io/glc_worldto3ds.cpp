@@ -31,11 +31,7 @@
 #include "../shading/glc_material.h"
 
 // Lib3ds Header
-#include "3rdparty/lib3ds/file.h"
-#include "3rdparty/lib3ds/mesh.h"
-#include "3rdparty/lib3ds/node.h"
-#include "3rdparty/lib3ds/matrix.h"
-#include "3rdparty/lib3ds/material.h"
+#include "3rdparty/lib3ds2/lib3ds.h"
 
 #include "glc_worldto3ds.h"
 
@@ -48,10 +44,11 @@ GLC_WorldTo3ds::GLC_WorldTo3ds(const GLC_World& world)
 , m_NameToMaterial()
 , m_pRootLib3dsNode(NULL)
 , m_CurrentNodeId(0)
-, m_OccIdToNodeId()
+, m_OccIdToNode()
 , m_CurrentMeshIndex(0)
 , m_UseAbsolutePosition(false)
 , m_TextureToFileName()
+, m_CurrentMeshCount(0)
 {
 
 
@@ -71,10 +68,11 @@ bool GLC_WorldTo3ds::exportToFile(const QString& fileName, bool useAbsolutePosit
 	m_NameToMaterial.clear();
 	m_pRootLib3dsNode= NULL;
 	m_CurrentNodeId= 0;
-	m_OccIdToNodeId.clear();
+	m_OccIdToNode.clear();
 	m_CurrentMeshIndex= 0;
 	m_UseAbsolutePosition= useAbsolutePosition;
 	m_TextureToFileName.clear();
+	m_CurrentMeshCount= 0;
 
 	m_FileName= fileName;
 	bool subject= false;
@@ -132,9 +130,12 @@ void GLC_WorldTo3ds::saveMeshes()
 				QList<Lib3dsMesh*> meshes= createMeshsFrom3DRep(pRep, meshName);
 				{
 					const int count= meshes.count();
-					for (int i= 0; i < count; ++i)
+					int meshIndex= m_CurrentMeshCount;
+					m_CurrentMeshCount+= count;
+					lib3ds_file_reserve_meshes(m_pLib3dsFile, m_CurrentMeshCount, false);
+					for (int i= 0; i < count; ++i, ++meshIndex)
 					{
-						lib3ds_file_insert_mesh(m_pLib3dsFile, meshes.at(i));
+						lib3ds_file_insert_mesh(m_pLib3dsFile, meshes.at(i), meshIndex);
 						m_ReferenceToMesh.insertMulti(pRef, meshes.at(i));
 					}
 				}
@@ -156,21 +157,21 @@ void GLC_WorldTo3ds::saveBranch(GLC_StructOccurence* pOcc)
 
 void GLC_WorldTo3ds::createNodeFromOccurrence(GLC_StructOccurence* pOcc)
 {
-	Lib3dsNode* p3dsNode = lib3ds_node_new_object();
-	p3dsNode->node_id= m_CurrentNodeId;
-	m_OccIdToNodeId.insert(pOcc->id(), m_CurrentNodeId++);
+	Lib3dsNode* p3dsNode =lib3ds_node_new(LIB3DS_NODE_MESH_INSTANCE);
+	p3dsNode->node_id= m_CurrentNodeId++;
+	m_OccIdToNode.insert(pOcc->id(), p3dsNode);
 
 	if (pOcc->parent() == m_World.rootOccurence())
 	{
-		p3dsNode->parent_id= LIB3DS_NO_PARENT;
+		p3dsNode->parent= NULL;
 	}
 	else
 	{
-		Q_ASSERT(m_OccIdToNodeId.contains(pOcc->parent()->id()));
-		p3dsNode->parent_id= m_OccIdToNodeId.value(pOcc->parent()->id());
+		Q_ASSERT(m_OccIdToNode.contains(pOcc->parent()->id()));
+		p3dsNode->parent= m_OccIdToNode.value(pOcc->parent()->id());
 	}
 
-	lib3ds_file_insert_node(m_pLib3dsFile, p3dsNode);
+	lib3ds_file_append_node(m_pLib3dsFile, p3dsNode, p3dsNode->parent);
 
 	GLC_StructReference* pRef= pOcc->structReference();
 	if (m_UseAbsolutePosition)
@@ -186,9 +187,13 @@ void GLC_WorldTo3ds::createNodeFromOccurrence(GLC_StructOccurence* pOcc)
 				QList<Lib3dsMesh*> meshes= createMeshsFrom3DRep(pRep, meshName, matrix);
 
 				const int meshCount= meshes.count();
-				for (int i= 0; i < meshCount; ++i)
+				int meshIndex= m_CurrentMeshCount;
+				m_CurrentMeshCount+= meshCount;
+				lib3ds_file_reserve_meshes(m_pLib3dsFile, m_CurrentMeshCount, false);
+
+				for (int i= 0; i < meshCount; ++i, ++meshIndex)
 				{
-					lib3ds_file_insert_mesh(m_pLib3dsFile, meshes.at(i));
+					lib3ds_file_insert_mesh(m_pLib3dsFile, meshes.at(i), meshIndex);
 				}
 
 				if (meshCount > 1)
@@ -196,12 +201,13 @@ void GLC_WorldTo3ds::createNodeFromOccurrence(GLC_StructOccurence* pOcc)
 					for (int i= 0; i < meshCount; ++i)
 					{
 
-						Lib3dsNode* pCurrent3dsNode = lib3ds_node_new_object();
+						Lib3dsNode* pCurrent3dsNode = lib3ds_node_new(LIB3DS_NODE_MESH_INSTANCE);
 						pCurrent3dsNode->node_id= m_CurrentNodeId++;
-						pCurrent3dsNode->parent_id= p3dsNode->node_id;
+						pCurrent3dsNode->parent= p3dsNode;
 
 						strcpy(pCurrent3dsNode->name, meshes.at(i)->name);
-						lib3ds_file_insert_node(m_pLib3dsFile, pCurrent3dsNode);
+
+						lib3ds_file_append_node(m_pLib3dsFile, pCurrent3dsNode, pCurrent3dsNode->parent);
 					}
 				}
 				else if (!meshes.isEmpty())
@@ -228,12 +234,12 @@ void GLC_WorldTo3ds::createNodeFromOccurrence(GLC_StructOccurence* pOcc)
 				for (int i= 0; i < meshCount; ++i)
 				{
 
-					Lib3dsNode* pCurrent3dsNode = lib3ds_node_new_object();
+					Lib3dsNode* pCurrent3dsNode = lib3ds_node_new(LIB3DS_NODE_MESH_INSTANCE);
 					pCurrent3dsNode->node_id= m_CurrentNodeId++;
-					pCurrent3dsNode->parent_id= p3dsNode->node_id;
+					pCurrent3dsNode->parent= p3dsNode;
 
 					strcpy(pCurrent3dsNode->name, meshes.at(i)->name);
-					lib3ds_file_insert_node(m_pLib3dsFile, pCurrent3dsNode);
+					lib3ds_file_append_node(m_pLib3dsFile, pCurrent3dsNode, pCurrent3dsNode->parent);
 				}
 			}
 			else
@@ -292,36 +298,33 @@ Lib3dsMesh* GLC_WorldTo3ds::create3dsMeshFromGLC_Mesh(GLC_Mesh* pMesh, const QSt
 	const int stride= 3;
 
 	GLfloatVector vertice= pMesh->positionVector();
+	GLfloatVector texelVector= pMesh->texelVector();
+
 	const uint pointsCount= vertice.count() / stride;
 
 	// Add points to the 3DS mesh
-	lib3ds_mesh_new_point_list(p3dsMesh, pointsCount);
+	lib3ds_mesh_resize_vertices(p3dsMesh, pointsCount, !texelVector.isEmpty(), true);
 
 	for (uint i= 0; i < pointsCount; ++i)
 	{
-		Lib3dsPoint point;
-		point.pos[0]= vertice[i * 3];
-		point.pos[1]= vertice[i * 3 + 1];
-		point.pos[2]= vertice[i * 3 + 2];
-
-		p3dsMesh->pointL[i]= point;
+		p3dsMesh->vertices[i][0]= vertice[i * 3];
+		p3dsMesh->vertices[i][1]= vertice[i * 3 + 1];
+		p3dsMesh->vertices[i][2]= vertice[i * 3 + 2];
 	}
 
 	// Add texel to the 3DS mesh
-	GLfloatVector texelVector= pMesh->texelVector();
 	if(!texelVector.isEmpty())
 	{
-		lib3ds_mesh_new_texel_list(p3dsMesh, pointsCount);
 		for (uint i= 0; i < pointsCount; ++i)
 		{
-			p3dsMesh->texelL[i][0]= texelVector[i * 2];
-			p3dsMesh->texelL[i][1]= texelVector[i * 2 + 1];
+			p3dsMesh->texcos[i][0]= texelVector[i * 2];
+			p3dsMesh->texcos[i][1]= texelVector[i * 2 + 1];
 		}
 	}
 
 	// Add faces to the 3ds mesh
 	const uint totalFaceCount= pMesh->faceCount(0);
-	lib3ds_mesh_new_face_list(p3dsMesh, totalFaceCount);
+	lib3ds_mesh_resize_faces(p3dsMesh, totalFaceCount);
 
 	QSet<GLC_Material*> materialSet= pMesh->materialSet();
 	QSet<GLC_Material*>::iterator iMat= materialSet.begin();
@@ -335,13 +338,13 @@ Lib3dsMesh* GLC_WorldTo3ds::create3dsMeshFromGLC_Mesh(GLC_Mesh* pMesh, const QSt
 		for (int i= 0; i < faceCount; ++i)
 		{
 			Lib3dsFace face;
-			strcpy(face.material, pMaterial->name);
+			face.material= lib3ds_file_material_by_name(m_pLib3dsFile, pMaterial->name);
 
-			face.points[0]= currentTriangleIndex.at(i * 3);
-			face.points[1]= currentTriangleIndex.at(i * 3 + 1);
-			face.points[2]= currentTriangleIndex.at(i * 3 + 2);
+			face.index[0]= currentTriangleIndex.at(i * 3);
+			face.index[1]= currentTriangleIndex.at(i * 3 + 1);
+			face.index[2]= currentTriangleIndex.at(i * 3 + 2);
 
-			p3dsMesh->faceL[currentFaceIndex++]= face;
+			p3dsMesh->faces[currentFaceIndex++]= face;
 			Q_ASSERT(currentFaceIndex <= totalFaceCount);
 		}
 		++iMat;
@@ -368,7 +371,11 @@ Lib3dsMaterial* GLC_WorldTo3ds::get3dsMaterialFromGLC_Material(GLC_Material* pMa
 
 Lib3dsMaterial* GLC_WorldTo3ds::create3dsMaterialFromGLC_Material(GLC_Material* pMat, const QString& matName)
 {
-	Lib3dsMaterial* pSubject= lib3ds_material_new();
+	Lib3dsMaterial* pSubject= new Lib3dsMaterial;
+	//lib3ds_file_reserve_materials(m_pLib3dsFile, m_pLib3dsFile->materials_size + 1, false);
+
+	lib3ds_file_insert_material(m_pLib3dsFile, pSubject, m_pLib3dsFile->materials_size - 1);
+
 	strcpy(pSubject->name, matName.toLocal8Bit().data());
 
 
@@ -437,7 +444,6 @@ Lib3dsMaterial* GLC_WorldTo3ds::create3dsMaterialFromGLC_Material(GLC_Material* 
 
 	}
 
-	lib3ds_file_insert_material(m_pLib3dsFile, pSubject);
 	m_NameToMaterial.insert(matName, pSubject);
 
 	return pSubject;
@@ -453,41 +459,43 @@ QString GLC_WorldTo3ds::materialName(GLC_Material* pMat) const
 
 void GLC_WorldTo3ds::setNodePosition(Lib3dsNode* pNode, const GLC_Matrix4x4& matrix)
 {
-	Lib3dsObjectData *pObjectData= &pNode->data.object;
+	Lib3dsMeshInstanceNode* pMeshNode= (Lib3dsMeshInstanceNode*)pNode;
 
 	// Translation
-	Lib3dsLin3Key* pLin3Key= lib3ds_lin3_key_new();
-	pLin3Key->value[0]= matrix.getData()[12];
-	pLin3Key->value[1]= matrix.getData()[13];
-	pLin3Key->value[2]= matrix.getData()[14];
 
-	pLin3Key->tcb.frame= 1;
-	pObjectData->pos_track.keyL= pLin3Key;
+	Lib3dsKey* pTranslationKey= new Lib3dsKey;
+	pTranslationKey->value[0]= matrix.getData()[12];
+	pTranslationKey->value[1]= matrix.getData()[13];
+	pTranslationKey->value[2]= matrix.getData()[14];
 
+	pTranslationKey->frame= 1;
+	pMeshNode->pos_track.nkeys= 1;
+	pMeshNode->pos_track.keys= pTranslationKey;
 
 	// Scaling
-	Lib3dsLin3Key* pScale3Key= lib3ds_lin3_key_new();
-	pScale3Key->value[0]= static_cast<float>(matrix.scalingX());
-	pScale3Key->value[1]= static_cast<float>(matrix.scalingY());
-	pScale3Key->value[2]= static_cast<float>(matrix.scalingZ());
+	Lib3dsKey* pScalingKey= new Lib3dsKey;
+	pScalingKey->value[0]= static_cast<float>(matrix.scalingX());
+	pScalingKey->value[1]= static_cast<float>(matrix.scalingY());
+	pScalingKey->value[2]= static_cast<float>(matrix.scalingZ());
 
-	pScale3Key->tcb.frame= 1;
-	pObjectData->scl_track.keyL= pScale3Key;
+	pScalingKey->frame= 1;
+	pMeshNode->scl_track.nkeys= 1;
+	pMeshNode->scl_track.keys= pScalingKey;
 
 	// Rotation
 
-	Lib3dsQuatKey* pQuatKey= lib3ds_quat_key_new();
+	Lib3dsKey* pRotationKey= new Lib3dsKey;
 
 	QQuaternion quaternion= matrix.quaternion();
 	QPair<GLC_Vector3d, double> pair= matrix.rotationVectorAndAngle();
 
-	pQuatKey->angle= static_cast<float>(pair.second);
-	pQuatKey->axis[0]= static_cast<float>(pair.first.x());
-	pQuatKey->axis[1]= static_cast<float>(pair.first.y());
-	pQuatKey->axis[2]= static_cast<float>(pair.first.z());
+	pRotationKey->value[3]= static_cast<float>(pair.second);
+	pRotationKey->value[0]= static_cast<float>(pair.first.x());
+	pRotationKey->value[1]= static_cast<float>(pair.first.y());
+	pRotationKey->value[2]= static_cast<float>(pair.first.z());
 
-	pQuatKey->tcb.frame= 1;
-
-	pObjectData->rot_track.keyL= pQuatKey;
+	pRotationKey->frame= 1;
+	pMeshNode->rot_track.nkeys= 1;
+	pMeshNode->rot_track.keys= pRotationKey;
 
 }

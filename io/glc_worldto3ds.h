@@ -136,10 +136,10 @@ private:
 	//! The current node id
 	int m_CurrentNodeId;
 
-	//! Occurence id to node id hash
-	QHash<GLC_uint, int> m_OccIdToNodeId;
+	//! Occurence id to node hash
+	QHash<GLC_uint, Lib3dsNode*> m_OccIdToNode;
 
-	//! The current mesh inde
+	//! The current mesh index
 	int m_CurrentMeshIndex;
 
 	//! Use absolute position (meshes are duplicated)
@@ -147,6 +147,9 @@ private:
 
 	//! GLC_Texture to fileName hash table
 	QHash<GLC_Texture*, QString> m_TextureToFileName;
+
+	//! The current mesh count
+	int m_CurrentMeshCount;
 };
 
 #endif /* GLC_WORLDTO3DS_H_ */

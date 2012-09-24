@@ -36,11 +36,7 @@
 #include "../sceneGraph/glc_structoccurence.h"
 
 // Lib3ds Header
-#include "3rdparty/lib3ds/file.h"
-#include "3rdparty/lib3ds/mesh.h"
-#include "3rdparty/lib3ds/node.h"
-#include "3rdparty/lib3ds/matrix.h"
-#include "3rdparty/lib3ds/material.h"
+#include "3rdparty/lib3ds2/lib3ds.h"
 
 #include <QFileInfo>
 #include <QGLContext>
@@ -91,7 +87,7 @@ GLC_World* GLC_3dsToWorld::CreateWorldFrom3ds(QFile &file)
 	m_pWorld= new GLC_World;
 
 	//Load 3ds File
-	m_pLib3dsFile=lib3ds_file_load(m_FileName.toLocal8Bit().data());
+	m_pLib3dsFile=lib3ds_file_open(m_FileName.toLocal8Bit().data());
 	if (!m_pLib3dsFile)
 	{
 		QString message= "GLC_3dsToWorld::CreateWorldFrom3ds : Loading Failed";
@@ -106,10 +102,8 @@ GLC_World* GLC_3dsToWorld::CreateWorldFrom3ds(QFile &file)
 
 	emit currentQuantum(m_CurrentQuantumValue);
 	// Count the number of meshes
-	for(Lib3dsMesh *pMesh= m_pLib3dsFile->meshes; pMesh != NULL; pMesh = pMesh->next)
-	{
-		++m_NumberOfMeshes;
-	}
+	m_NumberOfMeshes= m_pLib3dsFile->nmeshes;
+
 	// Check if there is some meshes in the 3ds file
 	if (0 == m_NumberOfMeshes)
 	{
@@ -126,16 +120,17 @@ GLC_World* GLC_3dsToWorld::CreateWorldFrom3ds(QFile &file)
 	}
 
 	// Load unloaded mesh name
-	for(Lib3dsMesh *pMesh= m_pLib3dsFile->meshes; pMesh != NULL; pMesh = pMesh->next)
+	for(int i= 0; i < m_NumberOfMeshes; ++i)
 	{
+		Lib3dsMesh *pMesh= m_pLib3dsFile->meshes[i];
 		if (!m_LoadedMeshes.contains(QString(pMesh->name)))
 		{
 			//qDebug() << "Mesh without parent found" << QString(pMesh->name);
-			Lib3dsNode *pNode= lib3ds_node_new_object();
-			strcpy(pNode->name, pMesh->name);
-			pNode->parent_id= LIB3DS_NO_PARENT;
-			lib3ds_file_insert_node(m_pLib3dsFile, pNode);
-			createMeshes(m_pWorld->rootOccurence(), pNode);
+
+
+			Lib3dsMeshInstanceNode *pMeshNode= lib3ds_node_new_mesh_instance(pMesh, pMesh->name, NULL, NULL, NULL);
+			lib3ds_file_append_node(m_pLib3dsFile, reinterpret_cast<Lib3dsNode*>(pMeshNode), m_pLib3dsFile->nodes);
+			createMeshes(m_pWorld->rootOccurence(), reinterpret_cast<Lib3dsNode*>(pMeshNode));
 		}
 	}
 
@@ -192,7 +187,7 @@ void GLC_3dsToWorld::createMeshes(GLC_StructOccurence* pProduct, Lib3dsNode* pFa
 	GLC_StructOccurence* pChildProduct= NULL;
 	Lib3dsMesh *pMesh= NULL;
 
-	if (pFatherNode->type == LIB3DS_OBJECT_NODE)
+	if (pFatherNode->type == LIB3DS_NODE_MESH_INSTANCE)
 	{
 		//qDebug() << "Node type LIB3DS_OBJECT_NODE is named : " << QString(pFatherNode->name);
 		//qDebug() << "Node Matrix :";
@@ -201,7 +196,7 @@ void GLC_3dsToWorld::createMeshes(GLC_StructOccurence* pProduct, Lib3dsNode* pFa
 		// Check if the node is a mesh or dummy
 		if (!(strcmp(pFatherNode->name,"$$$DUMMY")==0))
 		{
-	    	pMesh = lib3ds_file_mesh_by_name(m_pLib3dsFile, pFatherNode->name);
+	    	pMesh = lib3ds_file_mesh_for_node(m_pLib3dsFile, pFatherNode);
 		    if( pMesh != NULL )
 		    {
 		    	GLC_3DRep representation(create3DRep(pMesh));
@@ -215,9 +210,8 @@ void GLC_3dsToWorld::createMeshes(GLC_StructOccurence* pProduct, Lib3dsNode* pFa
 			    	GLC_Matrix4x4 matInv(&(pMesh->matrix[0][0]));
 					matInv.invert();
 					// Get the node pivot
-					Lib3dsObjectData *pObjectData;
-					pObjectData= &pFatherNode->data.object;
-					GLC_Matrix4x4 trans(-pObjectData->pivot[0], -pObjectData->pivot[1], -pObjectData->pivot[2]);
+					Lib3dsMeshInstanceNode* pInstanceNode= (Lib3dsMeshInstanceNode*)pFatherNode;
+					GLC_Matrix4x4 trans(-pInstanceNode->pivot[0], -pInstanceNode->pivot[1], -pInstanceNode->pivot[2]);
 					// Compute the part matrix
 					nodeMat= nodeMat * trans * matInv; // I don't know why...
 					nodeMat.optimise();
@@ -282,10 +276,10 @@ GLC_3DRep GLC_3dsToWorld::create3DRep(Lib3dsMesh* p3dsMesh)
 	GLC_Mesh * pMesh= new GLC_Mesh();
 	pMesh->setName(p3dsMesh->name);
 	// The mesh normals
-	const int normalsNumber= p3dsMesh->faces * 3;
+	const int normalsNumber= p3dsMesh->nfaces * 3;
 
-	Lib3dsVector *normalL= static_cast<Lib3dsVector*>(malloc(normalsNumber * sizeof(Lib3dsVector)));
-	lib3ds_mesh_calculate_normals(p3dsMesh, normalL);
+	float (*normalL)[3]= static_cast<float(*)[3]>(malloc(normalsNumber * sizeof(float[3])));
+	lib3ds_mesh_calculate_vertex_normals(p3dsMesh, normalL);
 
 	// Position vector
 	QVector<float> position(normalsNumber * 3);
@@ -296,26 +290,26 @@ GLC_3DRep GLC_3dsToWorld::create3DRep(Lib3dsMesh* p3dsMesh)
 
 	// Texel Vector
 	QVector<float> texel;
-	if (p3dsMesh->texels > 0)
+	if (p3dsMesh->texcos)
 	{
 		texel.resize(normalsNumber * 2);
 	}
 
 	int normalIndex= 0;
-	for (unsigned int i= 0; i < p3dsMesh->faces; ++i)
+	for (unsigned int i= 0; i < p3dsMesh->nfaces; ++i)
 	{
 		IndexList triangleIndex;
-		Lib3dsFace *p3dsFace=&p3dsMesh->faceL[i];
+		Lib3dsFace *p3dsFace=&p3dsMesh->faces[i];
 		for (int i=0; i < 3; ++i)
 		{
 			triangleIndex.append(normalIndex);
 			// Add vertex coordinate
-			memcpy((void*)&(position.data()[normalIndex * 3]), &p3dsMesh->pointL[p3dsFace->points[i]], 3 * sizeof(float));
+			memcpy((void*)&(position.data()[normalIndex * 3]), &p3dsMesh->vertices[p3dsFace->index[i]], 3 * sizeof(float));
 
 			// Add texel
-			if (p3dsMesh->texels > 0)
+			if (p3dsMesh->texcos)
 			{
-				memcpy((void*)&(texel.data()[normalIndex * 2]), &p3dsMesh->texelL[p3dsFace->points[i]], 2 * sizeof(float));
+				memcpy((void*)&(texel.data()[normalIndex * 2]), &p3dsMesh->texcos[p3dsFace->index[i]], 2 * sizeof(float));
 			}
 			++normalIndex;
 		}
@@ -323,26 +317,21 @@ GLC_3DRep GLC_3dsToWorld::create3DRep(Lib3dsMesh* p3dsMesh)
 		// Load the material
 		// The material current face index
 		GLC_Material* pCurMaterial= NULL;
-		if (p3dsFace->material[0])
-		{
-			Lib3dsMaterial* p3dsMat=lib3ds_file_material_by_name(m_pLib3dsFile, p3dsFace->material);
-			if (NULL != p3dsMat)
-			{
-				// Check it this material as already been loaded
-				const QString materialName(p3dsFace->material);
 
-				if (!m_Materials.contains(materialName))
-				{ // Material not already loaded, load it
-					loadMaterial(p3dsMat);
-				}
-				pCurMaterial= m_Materials.value(materialName);
-			}
+		Lib3dsMaterial* p3dsMat= m_pLib3dsFile->materials[p3dsFace->material];
+		// Check it this material as already been loaded
+		const QString materialName(p3dsMat->name);
+
+		if (!m_Materials.contains(materialName))
+		{ // Material not already loaded, load it
+			loadMaterial(p3dsMat);
 		}
+		pCurMaterial= m_Materials.value(materialName);
 		pMesh->addTriangles(pCurMaterial, triangleIndex);
 	}
 	pMesh->addVertice(position);
 	pMesh->addNormals(normal);
-	if (p3dsMesh->texels > 0)
+	if (p3dsMesh->texcos)
 	{
 		pMesh->addTexels(texel);
 	}
@@ -378,33 +367,23 @@ void GLC_3dsToWorld::loadMaterial(Lib3dsMaterial* p3dsMaterial)
 		QString textureFileName(fileInfo.absolutePath() + QDir::separator());
 		textureFileName.append(textureName);
 
-		// TGA file type are not supported
-		if (!textureName.right(3).contains("TGA", Qt::CaseInsensitive))
+		QFile textureFile(textureFileName);
+
+		if (textureFile.open(QIODevice::ReadOnly))
 		{
-			QFile textureFile(textureFileName);
-
-			if (textureFile.open(QIODevice::ReadOnly))
-			{
-				// Create the texture and assign it to the material
-				GLC_Texture *pTexture = new GLC_Texture(textureFile);
-				pMaterial->setTexture(pTexture);
-				m_ListOfAttachedFileName << textureFileName;
-				textureFile.close();
-			}
-			else
-			{
-				QStringList stringList(m_FileName);
-				stringList.append("Open File : " + textureFileName + " failed");
-				GLC_ErrorLog::addError(stringList);
-			}
-
+			// Create the texture and assign it to the material
+			GLC_Texture *pTexture = new GLC_Texture(textureFile);
+			pMaterial->setTexture(pTexture);
+			m_ListOfAttachedFileName << textureFileName;
+			textureFile.close();
 		}
 		else
 		{
 			QStringList stringList(m_FileName);
-			stringList.append("Image : " + textureFileName + " not suported");
+			stringList.append("Open File : " + textureFileName + " failed");
 			GLC_ErrorLog::addError(stringList);
 		}
+
 	}
 
 	// Ambient Color
