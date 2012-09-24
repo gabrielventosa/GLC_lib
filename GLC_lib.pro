@@ -34,27 +34,10 @@ HEADERS_QUAZIP +=	3rdparty/quazip/crypt.h \
 					3rdparty/quazip/unzip.h \
 					3rdparty/quazip/zip.h
 
-HEADERS_LIB3DS += 3rdparty/lib3ds/atmosphere.h \
-           3rdparty/lib3ds/background.h \
-           3rdparty/lib3ds/camera.h \
-           3rdparty/lib3ds/chunk.h \
-           3rdparty/lib3ds/chunktable.h \
-           3rdparty/lib3ds/ease.h \
-           3rdparty/lib3ds/file.h \
-           3rdparty/lib3ds/io.h \
-           3rdparty/lib3ds/light.h \
-           3rdparty/lib3ds/material.h \
-           3rdparty/lib3ds/matrix.h \
-           3rdparty/lib3ds/mesh.h \
-           3rdparty/lib3ds/node.h \
-           3rdparty/lib3ds/quat.h \
-           3rdparty/lib3ds/shadow.h \
-           3rdparty/lib3ds/tcb.h \
-           3rdparty/lib3ds/tracks.h \
-           3rdparty/lib3ds/types.h \
-           3rdparty/lib3ds/vector.h \
-           3rdparty/lib3ds/viewport.h
-           
+HEADERS_LIB3DS2 +=  3rdparty/lib3ds2/lib3ds_impl.h \
+					3rdparty/lib3ds2/lib3ds.h
+
+
 HEADERS_GLEXT += 3rdparty/glext/glext.h
 
 HEADERS_GLC_MATHS += 	maths/glc_utils_maths.h \
@@ -177,7 +160,7 @@ HEADERS_GLC_3DWIDGET += 3DWidget/glc_3dwidget.h \
 
 HEADERS_GLC_GLU +=	glu/glc_glu.h
 
-HEADERS += $${HEADERS_QUAZIP} $${HEADERS_LIB3DS} $${HEADERS_GLC_MATHS} $${HEADERS_GLC_IO}
+HEADERS += $${HEADERS_QUAZIP} $${HEADERS_LIB3DS2} $${HEADERS_GLC_MATHS} $${HEADERS_GLC_IO}
 HEADERS += $${HEADERS_GLC} $${HEADERS_GLEXT} $${HEADERS_GLC_SCENEGRAPH} $${HEADERS_GLC_GEOMETRY}
 HEADERS += $${HEADERS_GLC_SHADING} $${HEADERS_GLC_VIEWPORT} $${HEADERS_GLC_3DWIDGET} $${HEADERS_GLC_GLU}
 		   
@@ -199,26 +182,27 @@ SOURCES += 3rdparty/quazip/ioapi.c \
            3rdparty/quazip/quazipnewinfo.cpp \
            3rdparty/quazip/unzip.c \
            3rdparty/quazip/zip.c
-
-SOURCES += 3rdparty/lib3ds/atmosphere.c \
-           3rdparty/lib3ds/background.c \
-           3rdparty/lib3ds/camera.c \
-           3rdparty/lib3ds/chunk.c \
-           3rdparty/lib3ds/ease.c \
-           3rdparty/lib3ds/file.c \
-           3rdparty/lib3ds/io.c \
-           3rdparty/lib3ds/light.c \
-           3rdparty/lib3ds/material.c \
-           3rdparty/lib3ds/matrix.c \
-           3rdparty/lib3ds/mesh.c \
-           3rdparty/lib3ds/node.c \
-           3rdparty/lib3ds/quat.c \
-           3rdparty/lib3ds/shadow.c \
-           3rdparty/lib3ds/tcb.c \
-           3rdparty/lib3ds/tracks.c \
-           3rdparty/lib3ds/vector.c \
-           3rdparty/lib3ds/viewport.c
-   
+ 
+SOURCES +=  3rdparty/lib3ds2/lib3ds_atmosphere.c \
+			3rdparty/lib3ds2/lib3ds_background.c \
+			3rdparty/lib3ds2/lib3ds_camera.c \
+			3rdparty/lib3ds2/lib3ds_chunk.c \
+			3rdparty/lib3ds2/lib3ds_chunktable.c \
+			3rdparty/lib3ds2/lib3ds_file.c \
+			3rdparty/lib3ds2/lib3ds_io.c \
+			3rdparty/lib3ds2/lib3ds_light.c \
+			3rdparty/lib3ds2/lib3ds_material.c \
+			3rdparty/lib3ds2/lib3ds_math.c \
+			3rdparty/lib3ds2/lib3ds_matrix.c \
+			3rdparty/lib3ds2/lib3ds_mesh.c \
+			3rdparty/lib3ds2/lib3ds_node.c \
+			3rdparty/lib3ds2/lib3ds_quat.c \
+			3rdparty/lib3ds2/lib3ds_shadow.c \
+			3rdparty/lib3ds2/lib3ds_track.c \
+			3rdparty/lib3ds2/lib3ds_util.c \
+			3rdparty/lib3ds2/lib3ds_vector.c \
+			3rdparty/lib3ds2/lib3ds_viewport.c
+			
 SOURCES +=	maths/glc_matrix4x4.cpp \
 			maths/glc_vector4d.cpp \
 			maths/glc_interpolator.cpp \
