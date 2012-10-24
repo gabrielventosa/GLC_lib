@@ -416,6 +416,7 @@ HEADERS_INST = include/GLC_BoundingBox \
     		   include/GLC_RepFlyMover \
     		   include/GLC_WorldTo3dxml \
     		   include/GLC_WorldTo3ds \
+                   include/GLC_WorldtoSTL \
     		   include/GLC_RenderStatistics \
     		   include/GLC_Ext \
     		   include/GLC_Cone \
