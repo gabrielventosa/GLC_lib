@@ -1,0 +1,127 @@
+#include "glc_worldtostl.h"
+
+#include "../glc_exception.h"
+#include "../geometry/glc_mesh.h"
+
+GLC_WorldToSTL::GLC_WorldToSTL(const GLC_World& world, bool threaded) :
+    QObject()
+  , m_World(world)
+  , m_FileName()
+//  , m_pOutStream(NULL)
+//  , m_CurrentId(0)
+  , m_pCurrentFile(NULL)
+  , m_AbsolutePath()
+//  , m_ReferenceToIdHash()
+//  , m_InstanceToIdHash()
+//  , m_ReferenceRepToIdHash()
+//  , m_InstanceRep()
+  , m_FileNameIncrement(0)
+ // , m_ListOfOverLoadedOccurence()
+  , m_pReadWriteLock(NULL)
+  , m_pIsInterupted(NULL)
+  , m_IsThreaded(threaded)
+{
+    m_World.rootOccurence()->updateOccurenceNumber(1);
+}
+
+GLC_WorldToSTL::~GLC_WorldToSTL()
+{
+    delete m_pCurrentFile;
+}
+
+bool GLC_WorldToSTL::exportToSTL(const QString& filename)
+{
+    m_FileNameIncrement= 0;
+    m_FileName= filename;
+
+    //int previousQuantumValue= 0;
+    //int currentQuantumValue= 0;
+    //emit currentQuantum(currentQuantumValue);
+
+    QFile file (m_FileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+             return false;
+
+    QTextStream outStream(&file);
+
+    exportAssemblyFromOccurence(m_World.rootOccurence(), outStream);
+
+    file.close();
+
+    return true;
+
+}
+
+void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOccurence, QTextStream &outStream)
+{
+
+    const int childCount = pOccurence->childCount();
+    for (int i=0;i < childCount; i++)
+    {
+        exportAssemblyFromOccurence(pOccurence->child(i), outStream);
+        qDebug() << "Processing child: " << pOccurence->child(i)->structReference()->name();
+        GLC_StructReference* pCurrentRef= pOccurence->child(i)->structReference();
+        if (pCurrentRef->hasRepresentation())
+        {
+            GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
+            for (int j=0; j<pCurrentRep->numberOfBody();j++)
+            {
+                GLC_Mesh* pMesh = dynamic_cast <GLC_Mesh*> (pCurrentRep->geomAt(j));
+                qDebug() <<"Number of faces " << pMesh->faceCount(0);
+                GLfloatVector positionVector = pMesh->positionVector();
+
+                //GLfloatVector normalVector = pMesh->normalVector();
+                GLfloatVector normalVector = calculateNormals(positionVector);
+
+
+
+                outStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
+               // for (int k=0; k < pMesh->faceCount(0); k++)
+                for (int k=0; k < positionVector.size()/9; k++)
+                {
+                    outStream<< "    facet normal " << QString::number(normalVector.at((k*3)),'E',6) << " " << QString::number(normalVector.at((k*3)+1),'E',6) << " " << QString::number(normalVector.at((k*3)+2),'E',6) << "\n";
+                    outStream<< "    outer loop\n";
+                    outStream<< "    vertex " << QString::number(positionVector.at(k*9),'E',6) << " " << QString::number(positionVector.at((k*9)+1),'E',6) << " " << QString::number(positionVector.at((k*9)+2),'E',6)<<"\n";
+                    outStream<< "    vertex " << QString::number(positionVector.at((k*9)+3),'E',6) << " " << QString::number(positionVector.at((k*9)+4),'E',6) << " " << QString::number(positionVector.at((k*9)+5),'E',6)<<"\n";
+                    outStream<< "    vertex " << QString::number(positionVector.at((k*9)+6),'E',6) << " " << QString::number(positionVector.at((k*9)+7),'E',6) << " " << QString::number(positionVector.at((k*9)+8),'E',6)<<"\n";
+                    outStream<< "    endloop\n";
+                    outStream<< "    endfacet\n";
+                }
+                outStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
+
+            }
+        }
+    }
+
+    return;
+}
+
+GLfloatVector GLC_WorldToSTL::calculateNormals(GLfloatVector NormalsVector){
+
+    GLfloatVector normals;
+    qDebug() <<"Size of Normals Vector: " << NormalsVector.size();
+
+    for (int i=0; i< NormalsVector.size()/9;i++){
+        float orig1 = NormalsVector.at(i*9);
+        float orig2 = NormalsVector.at((i*9)+1);
+        float orig3 = NormalsVector.at((i*9)+2);
+
+        float a1 = NormalsVector.at((i*9)+3)-orig1;
+        float a2 = NormalsVector.at((i*9)+4)-orig2;
+        float a3 = NormalsVector.at((i*9)+5)-orig3;
+
+        float b1 = NormalsVector.at((i*9)+6)-orig1;
+        float b2 = NormalsVector.at((i*9)+7)-orig2;
+        float b3 = NormalsVector.at((i*9)+8)-orig3;
+
+        float n1 = a2*b3-a3*b2;
+        float n2 = a3*b1-a1*b3;
+        float n3 = a1*b2-a2*b1;
+
+        normals.append(n1);
+        normals.append(n2);
+        normals.append(n3);
+    }
+    return normals;
+
+}
