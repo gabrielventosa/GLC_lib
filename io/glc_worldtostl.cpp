@@ -67,28 +67,53 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
             for (int j=0; j<pCurrentRep->numberOfBody();j++)
             {
                 GLC_Mesh* pMesh = dynamic_cast <GLC_Mesh*> (pCurrentRep->geomAt(j));
-                qDebug() <<"Number of faces " << pMesh->faceCount(0);
-                GLfloatVector positionVector = pMesh->positionVector();
-
-                //GLfloatVector normalVector = pMesh->normalVector();
-                GLfloatVector normalVector = calculateNormals(positionVector);
-
-
-
-                outStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
-               // for (int k=0; k < pMesh->faceCount(0); k++)
-                for (int k=0; k < positionVector.size()/9; k++)
+                QSet<GLC_Material*> materialSet = pMesh->materialSet();
+                QSet<GLC_Material*>::iterator iMat = materialSet.begin();
+                while(iMat !=materialSet.end())
                 {
-                    outStream<< "    facet normal " << QString::number(normalVector.at((k*3)),'E',6) << " " << QString::number(normalVector.at((k*3)+1),'E',6) << " " << QString::number(normalVector.at((k*3)+2),'E',6) << "\n";
-                    outStream<< "    outer loop\n";
-                    outStream<< "    vertex " << QString::number(positionVector.at(k*9),'E',6) << " " << QString::number(positionVector.at((k*9)+1),'E',6) << " " << QString::number(positionVector.at((k*9)+2),'E',6)<<"\n";
-                    outStream<< "    vertex " << QString::number(positionVector.at((k*9)+3),'E',6) << " " << QString::number(positionVector.at((k*9)+4),'E',6) << " " << QString::number(positionVector.at((k*9)+5),'E',6)<<"\n";
-                    outStream<< "    vertex " << QString::number(positionVector.at((k*9)+6),'E',6) << " " << QString::number(positionVector.at((k*9)+7),'E',6) << " " << QString::number(positionVector.at((k*9)+8),'E',6)<<"\n";
-                    outStream<< "    endloop\n";
-                    outStream<< "    endfacet\n";
-                }
-                outStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
+                        GLC_Material* pCurrentGLCMat =*iMat;
+                        qDebug() << "       Processing Material: " << pCurrentGLCMat->name();
+                        GLfloatVector positionVector = pMesh->positionVector();
+                        IndexList currentTriangleIndex= pMesh->getEquivalentTrianglesStripsFansIndex(0, pCurrentGLCMat->id());
+                        const int faceCount= currentTriangleIndex.count() / 3;
 
+                        outStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
+
+                        for (int k=0; k < faceCount; k++)
+                        {
+                           GLuint vertex1 = currentTriangleIndex.at(k*3);
+                           GLuint vertex2 = currentTriangleIndex.at((k*3)+1);
+                           GLuint vertex3 = currentTriangleIndex.at((k*3)+2);
+
+                           GLfloatVector faceVertexCoords;
+                           faceVertexCoords.append(positionVector.at(vertex1*3));
+                           faceVertexCoords.append(positionVector.at((vertex1*3))+1);
+                           faceVertexCoords.append(positionVector.at((vertex1*3))+2);
+
+                           faceVertexCoords.append(positionVector.at(vertex2*3));
+                           faceVertexCoords.append(positionVector.at((vertex2*3))+1);
+                           faceVertexCoords.append(positionVector.at((vertex2*3))+2);
+
+                           faceVertexCoords.append(positionVector.at(vertex3*3));
+                           faceVertexCoords.append(positionVector.at((vertex3*3))+1);
+                           faceVertexCoords.append(positionVector.at((vertex3*3))+2);
+
+                           GLfloatVector normalVector = calculateNormals(faceVertexCoords);
+
+
+                            outStream<< "    facet normal " << QString::number(normalVector.at(0),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << "\n";
+                            outStream<< "    outer loop\n";
+                            outStream<< "    vertex " << QString::number(faceVertexCoords.at(0),'E',6) << " " << QString::number(faceVertexCoords.at(1),'E',6) << " " << QString::number(faceVertexCoords.at(2),'E',6)<<"\n";
+                            outStream<< "    vertex " << QString::number(faceVertexCoords.at(3),'E',6) << " " << QString::number(faceVertexCoords.at(4),'E',6) << " " << QString::number(faceVertexCoords.at(5),'E',6)<<"\n";
+                            outStream<< "    vertex " << QString::number(faceVertexCoords.at(6),'E',6) << " " << QString::number(faceVertexCoords.at(7),'E',6) << " " << QString::number(faceVertexCoords.at(8),'E',6)<<"\n";
+                            outStream<< "    endloop\n";
+                            outStream<< "    endfacet\n";
+
+
+                        }
+                        outStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
+                        ++iMat;
+                }
             }
         }
     }
@@ -99,20 +124,18 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
 GLfloatVector GLC_WorldToSTL::calculateNormals(GLfloatVector NormalsVector){
 
     GLfloatVector normals;
-    qDebug() <<"Size of Normals Vector: " << NormalsVector.size();
 
-    for (int i=0; i< NormalsVector.size()/9;i++){
-        float orig1 = NormalsVector.at(i*9);
-        float orig2 = NormalsVector.at((i*9)+1);
-        float orig3 = NormalsVector.at((i*9)+2);
+        float orig1 = NormalsVector.at(0);
+        float orig2 = NormalsVector.at(1);
+        float orig3 = NormalsVector.at(2);
 
-        float a1 = NormalsVector.at((i*9)+3)-orig1;
-        float a2 = NormalsVector.at((i*9)+4)-orig2;
-        float a3 = NormalsVector.at((i*9)+5)-orig3;
+        float a1 = NormalsVector.at(3);
+        float a2 = NormalsVector.at(4);
+        float a3 = NormalsVector.at(5);
 
-        float b1 = NormalsVector.at((i*9)+6)-orig1;
-        float b2 = NormalsVector.at((i*9)+7)-orig2;
-        float b3 = NormalsVector.at((i*9)+8)-orig3;
+        float b1 = NormalsVector.at(6)-orig1;
+        float b2 = NormalsVector.at(7)-orig2;
+        float b3 = NormalsVector.at(8)-orig3;
 
         float n1 = a2*b3-a3*b2;
         float n2 = a3*b1-a1*b3;
@@ -121,7 +144,7 @@ GLfloatVector GLC_WorldToSTL::calculateNormals(GLfloatVector NormalsVector){
         normals.append(n1);
         normals.append(n2);
         normals.append(n3);
-    }
+
     return normals;
 
 }
