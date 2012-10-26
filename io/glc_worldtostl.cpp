@@ -74,6 +74,11 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
                         GLC_Material* pCurrentGLCMat =*iMat;
                         qDebug() << "       Processing Material: " << pCurrentGLCMat->name();
                         GLfloatVector positionVector = pMesh->positionVector();
+                        qDebug() << "       Position Vector: ";
+                        for(int i=0;i<9;i++)
+                        {
+                            qDebug() << positionVector.at(i);
+                        }
                         IndexList currentTriangleIndex= pMesh->getEquivalentTrianglesStripsFansIndex(0, pCurrentGLCMat->id());
                         const int faceCount= currentTriangleIndex.count() / 3;
                         qDebug() << "       Number of faces: " << faceCount;
@@ -86,20 +91,26 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
                            GLuint vertex1 = currentTriangleIndex.at(k*3);
                            GLuint vertex2 = currentTriangleIndex.at((k*3)+1);
                            GLuint vertex3 = currentTriangleIndex.at((k*3)+2);
-                            qDebug() << "               Vertex indexes: " <<vertex1<<","<<vertex2<<","<<vertex3;
+                           qDebug() << "               Vertex indexes: " <<vertex1<<","<<vertex2<<","<<vertex3;
 
                            GLfloatVector faceVertexCoords;
                            faceVertexCoords.append(positionVector.at(vertex1*3));
-                           faceVertexCoords.append(positionVector.at((vertex1*3))+1);
-                           faceVertexCoords.append(positionVector.at((vertex1*3))+2);
+                           faceVertexCoords.append(positionVector.at((vertex1*3)+1));
+                           faceVertexCoords.append(positionVector.at((vertex1*3)+2));
 
                            faceVertexCoords.append(positionVector.at(vertex2*3));
-                           faceVertexCoords.append(positionVector.at((vertex2*3))+1);
-                           faceVertexCoords.append(positionVector.at((vertex2*3))+2);
+                           faceVertexCoords.append(positionVector.at((vertex2*3)+1));
+                           faceVertexCoords.append(positionVector.at((vertex2*3)+2));
 
                            faceVertexCoords.append(positionVector.at(vertex3*3));
-                           faceVertexCoords.append(positionVector.at((vertex3*3))+1);
-                           faceVertexCoords.append(positionVector.at((vertex3*3))+2);
+                           faceVertexCoords.append(positionVector.at((vertex3*3)+1));
+                           faceVertexCoords.append(positionVector.at((vertex3*3)+2));
+
+                           qDebug() << "Vertex coords: ";
+                           for(int i;i<faceVertexCoords.size();i++)
+                           {
+                               qDebug() << faceVertexCoords.at(i);
+                           }
 
                            GLfloatVector normalVector = calculateNormals(faceVertexCoords);
 
@@ -127,6 +138,10 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
 GLfloatVector GLC_WorldToSTL::calculateNormals(GLfloatVector NormalsVector){
 
     GLfloatVector normals;
+
+    for(int i =0; i< NormalsVector.size();i++){
+        qDebug() <<NormalsVector.at(i);
+    }
 
         float orig1 = NormalsVector.at(0);
         float orig2 = NormalsVector.at(1);
