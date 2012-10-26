@@ -83,7 +83,7 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
                         qDebug() << "       Number of faces: " << faceCount;
                         outStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
 
-                        QFile dfile ("/Users/gabriel/stl/"+ChildName+"-"+MaterialName+"MESH"+j+".stl");
+                        QFile dfile ("/Users/gabriel/stl/"+ChildName+"-"+MaterialName+"MESH"+QString::number(j)+".stl");
                         if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
                                  return;
 
