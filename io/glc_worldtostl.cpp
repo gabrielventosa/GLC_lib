@@ -67,28 +67,29 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
             GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
             for (int j=0; j<pCurrentRep->numberOfBody();j++)
             {
+
+                QFile dfile ("/Users/gabriel/stl2/"+ChildName+"-"+"MESH-"+QString::number(j)+".stl");
+                if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
+                         return;
+                QTextStream doutStream(&dfile);
+                doutStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
+
+
                 GLC_Mesh* pMesh = dynamic_cast <GLC_Mesh*> (pCurrentRep->geomAt(j));
                 QSet<GLC_Material*> materialSet = pMesh->materialSet();
                 QSet<GLC_Material*>::iterator iMat = materialSet.begin();
                 while(iMat !=materialSet.end())
+
                 {
                         GLC_Material* pCurrentGLCMat =*iMat;
-                        qDebug() << "       Processing Material: " << pCurrentGLCMat->name();
                         QString MaterialName = pCurrentGLCMat->name();
 
                         GLfloatVector positionVector = pMesh->positionVector();
 
                         IndexList currentTriangleIndex= pMesh->getEquivalentTrianglesStripsFansIndex(0, pCurrentGLCMat->id());
                         const int faceCount= currentTriangleIndex.count() / 3;
-                        qDebug() << "       Number of faces: " << faceCount;
                         outStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
 
-                        QFile dfile ("/Users/gabriel/stl/"+ChildName+"-"+MaterialName+"MESH"+QString::number(j)+".stl");
-                        if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
-                                 return;
-
-                        QTextStream doutStream(&dfile);
-                        doutStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
 
                         for (int k=0; k < faceCount; k++)
                         {
@@ -133,12 +134,13 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
 
                         }
                         outStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
-                        doutStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
 
                         ++iMat;
-                        dfile.close();
+
 
                 }
+                doutStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
+                dfile.close();
             }
         }
     }
