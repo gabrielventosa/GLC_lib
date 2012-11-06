@@ -79,8 +79,9 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
             GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
             for (int j=0; j<pCurrentRep->numberOfBody();j++)
             {
-
-                QFile dfile (filepath+filename+ChildName+"-"+"MESH-"+QString::number(j)+".stl");
+                qDebug() << "File path: " << filepath;
+                qDebug() << "File name: " << filename+ChildName+"-"+"MESH-"+QString::number(j)+".stl";
+                QFile dfile (filepath+"/"+filename+ChildName+"-"+"MESH-"+QString::number(j)+".stl");
                 if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
                          return;
                 QTextStream doutStream(&dfile);
