@@ -44,7 +44,7 @@ bool GLC_WorldToSTL::exportToSTL(const QString& filename)
 
     QTextStream outStream(&file);
 
-    exportAssemblyFromOccurence(m_World.rootOccurence(), outStream);
+    exportAssemblyFromOccurence(m_World.rootOccurence(), outStream, &file);
 
     file.close();
 
@@ -52,13 +52,25 @@ bool GLC_WorldToSTL::exportToSTL(const QString& filename)
 
 }
 
-void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOccurence, QTextStream &outStream)
+void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOccurence, QTextStream &outStream, QFile *outFile)
 {
+   QString filename;
+   QString filepath;
+   QString fullpath = outFile->fileName();
+   if (!fullpath.isNull()){
+       QFileInfo pathinfo(fullpath);
+       filename = pathinfo.fileName();
+       filepath = pathinfo.path();
+       filename = filename.split(".").at(0);
+       qDebug() << "FileName:"<<filename;
+   }
+
+
 
     const int childCount = pOccurence->childCount();
     for (int i=0;i < childCount; i++)
     {
-        exportAssemblyFromOccurence(pOccurence->child(i), outStream);
+        exportAssemblyFromOccurence(pOccurence->child(i), outStream, outFile);
         qDebug() << "Processing child: " << pOccurence->child(i)->structReference()->name();
         QString ChildName = pOccurence->child(i)->structReference()->name();
         GLC_StructReference* pCurrentRef= pOccurence->child(i)->structReference();
@@ -68,7 +80,7 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
             for (int j=0; j<pCurrentRep->numberOfBody();j++)
             {
 
-                QFile dfile ("/Users/gabriel/stl2/"+ChildName+"-"+"MESH-"+QString::number(j)+".stl");
+                QFile dfile (filepath+filename+ChildName+"-"+"MESH-"+QString::number(j)+".stl");
                 if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
                          return;
                 QTextStream doutStream(&dfile);
