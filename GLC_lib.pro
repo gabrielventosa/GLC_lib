@@ -442,8 +442,11 @@ HEADERS_INST = include/GLC_BoundingBox \
 # Linux and macx install configuration
 unix {
     # Location of HEADERS and library
-    LIB_DIR = /usr/local/lib
-    INCLUDE_DIR = /usr/local/include
+    #Now GLC installs in local user folder
+    #LIB_DIR = /usr/local/lib
+    #INCLUDE_DIR = /usr/local/include
+    LIB_DIR = $$(HOME)"/GLC_lib/lib"
+    INCLUDE_DIR = $$(HOME)
     # Adds a -P to preserve link
 	QMAKE_COPY_FILE = $${QMAKE_COPY_FILE} -P
 	include.path = $${INCLUDE_DIR}/GLC_lib
@@ -494,7 +497,7 @@ include_glc_glu.files = $${HEADERS_GLC_GLU}
 
 # install library
 target.path = $${LIB_DIR}
-   
+#target.path=/home/gabriel/GLC_lib/lib
 # "make install" configuration options
 INSTALLS += include_lib3ds include_glext include_quazip include_glc_maths include_glc_io
 INSTALLS += include_glc_scengraph include_glc_geometry include_glc_shading include_glc_viewport
