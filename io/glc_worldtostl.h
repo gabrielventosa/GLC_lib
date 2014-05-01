@@ -31,6 +31,7 @@ private:
     //! Export the assembly structure from the list of reference
     void exportAssemblyStructure();
     void exportAssemblyFromOccurence(const GLC_StructOccurence* pOccurence, QTextStream &outStream, QFile *outFile);
+    void ExportRepresentation(GLC_3DRep* pCurrentRep, QTextStream &outStream, QString filepath, QString filename, QString solidname);
     GLfloatVector calculateNormals(GLfloatVector NormalsVector);
 
 

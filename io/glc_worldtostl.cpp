@@ -56,6 +56,7 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
 {
    QString filename;
    QString filepath;
+   QString solidname;
    QString fullpath = outFile->fileName();
    if (!fullpath.isNull()){
        QFileInfo pathinfo(fullpath);
@@ -77,88 +78,95 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
         if (pCurrentRef->hasRepresentation())
         {
             GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
-            for (int j=0; j<pCurrentRep->numberOfBody();j++)
-            {
-                qDebug() << "File path: " << filepath;
-                qDebug() << "File name: " << filename+ChildName+"-"+"MESH-"+QString::number(j)+".stl";
-                QFile dfile (filepath+"/"+filename+ChildName+"-"+"MESH-"+QString::number(j)+".stl");
-                if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
-                         return;
-                QTextStream doutStream(&dfile);
-                doutStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
+            solidname = pOccurence->child(i)->structReference()->name();
+            ExportRepresentation(pCurrentRep, outStream, filepath, filename+ChildName, solidname);
 
-
-                GLC_Mesh* pMesh = dynamic_cast <GLC_Mesh*> (pCurrentRep->geomAt(j));
-                QSet<GLC_Material*> materialSet = pMesh->materialSet();
-                QSet<GLC_Material*>::iterator iMat = materialSet.begin();
-                while(iMat !=materialSet.end())
-
-                {
-                        GLC_Material* pCurrentGLCMat =*iMat;
-                        QString MaterialName = pCurrentGLCMat->name();
-
-                        GLfloatVector positionVector = pMesh->positionVector();
-
-                        IndexList currentTriangleIndex= pMesh->getEquivalentTrianglesStripsFansIndex(0, pCurrentGLCMat->id());
-                        const int faceCount= currentTriangleIndex.count() / 3;
-                        outStream << "solid " << pOccurence->child(i)->structReference()->name() << "\n";
-
-
-                        for (int k=0; k < faceCount; k++)
-                        {
-
-                           GLuint vertex1 = currentTriangleIndex.at(k*3);
-                           GLuint vertex2 = currentTriangleIndex.at((k*3)+1);
-                           GLuint vertex3 = currentTriangleIndex.at((k*3)+2);
-
-                           GLfloatVector faceVertexCoords;
-                           faceVertexCoords.append(positionVector.at(vertex1*3));
-                           faceVertexCoords.append(positionVector.at((vertex1*3)+1));
-                           faceVertexCoords.append(positionVector.at((vertex1*3)+2));
-
-                           faceVertexCoords.append(positionVector.at(vertex2*3));
-                           faceVertexCoords.append(positionVector.at((vertex2*3)+1));
-                           faceVertexCoords.append(positionVector.at((vertex2*3)+2));
-
-                           faceVertexCoords.append(positionVector.at(vertex3*3));
-                           faceVertexCoords.append(positionVector.at((vertex3*3)+1));
-                           faceVertexCoords.append(positionVector.at((vertex3*3)+2));
-
-
-                           GLfloatVector normalVector = calculateNormals(faceVertexCoords);
-
-
-                            outStream<< "    facet normal " << QString::number(normalVector.at(0),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << "\n";
-                            outStream<< "    outer loop\n";
-                            outStream<< "    vertex " << QString::number(faceVertexCoords.at(0),'E',6) << " " << QString::number(faceVertexCoords.at(1),'E',6) << " " << QString::number(faceVertexCoords.at(2),'E',6)<<"\n";
-                            outStream<< "    vertex " << QString::number(faceVertexCoords.at(3),'E',6) << " " << QString::number(faceVertexCoords.at(4),'E',6) << " " << QString::number(faceVertexCoords.at(5),'E',6)<<"\n";
-                            outStream<< "    vertex " << QString::number(faceVertexCoords.at(6),'E',6) << " " << QString::number(faceVertexCoords.at(7),'E',6) << " " << QString::number(faceVertexCoords.at(8),'E',6)<<"\n";
-                            outStream<< "    endloop\n";
-                            outStream<< "    endfacet\n";
-
-                            doutStream<< "    facet normal " << QString::number(normalVector.at(0),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << "\n";
-                            doutStream<< "    outer loop\n";
-                            doutStream<< "    vertex " << QString::number(faceVertexCoords.at(0),'E',6) << " " << QString::number(faceVertexCoords.at(1),'E',6) << " " << QString::number(faceVertexCoords.at(2),'E',6)<<"\n";
-                            doutStream<< "    vertex " << QString::number(faceVertexCoords.at(3),'E',6) << " " << QString::number(faceVertexCoords.at(4),'E',6) << " " << QString::number(faceVertexCoords.at(5),'E',6)<<"\n";
-                            doutStream<< "    vertex " << QString::number(faceVertexCoords.at(6),'E',6) << " " << QString::number(faceVertexCoords.at(7),'E',6) << " " << QString::number(faceVertexCoords.at(8),'E',6)<<"\n";
-                            doutStream<< "    endloop\n";
-                            doutStream<< "    endfacet\n";
-
-
-                        }
-                        outStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
-
-                        ++iMat;
-
-
-                }
-                doutStream << "endsolid " << pOccurence->child(i)->structReference()->name()<<"\n";
-                dfile.close();
-            }
         }
     }
 
     return;
+}
+
+void GLC_WorldToSTL::ExportRepresentation(GLC_3DRep* pCurrentRep, QTextStream &outStream, QString filepath, QString filename, QString solidname)
+{
+    for (int j=0; j<pCurrentRep->numberOfBody();j++)
+    {
+        qDebug() << "File path: " << filepath;
+        qDebug() << "File name: " << filename+"-"+"MESH-"+QString::number(j)+".stl";
+        QFile dfile (filepath+"/"+filename+"-"+"MESH-"+QString::number(j)+".stl");
+        if (!dfile.open(QIODevice::WriteOnly | QIODevice::Text))
+                 return;
+        QTextStream doutStream(&dfile);
+        doutStream << "solid " << solidname << "\n";
+
+
+        GLC_Mesh* pMesh = dynamic_cast <GLC_Mesh*> (pCurrentRep->geomAt(j));
+        QSet<GLC_Material*> materialSet = pMesh->materialSet();
+        QSet<GLC_Material*>::iterator iMat = materialSet.begin();
+        while(iMat !=materialSet.end())
+
+        {
+                GLC_Material* pCurrentGLCMat =*iMat;
+                QString MaterialName = pCurrentGLCMat->name();
+
+                GLfloatVector positionVector = pMesh->positionVector();
+
+                IndexList currentTriangleIndex= pMesh->getEquivalentTrianglesStripsFansIndex(0, pCurrentGLCMat->id());
+                const int faceCount= currentTriangleIndex.count() / 3;
+                outStream << "solid " << solidname << "\n";
+
+
+                for (int k=0; k < faceCount; k++)
+                {
+
+                   GLuint vertex1 = currentTriangleIndex.at(k*3);
+                   GLuint vertex2 = currentTriangleIndex.at((k*3)+1);
+                   GLuint vertex3 = currentTriangleIndex.at((k*3)+2);
+
+                   GLfloatVector faceVertexCoords;
+                   faceVertexCoords.append(positionVector.at(vertex1*3));
+                   faceVertexCoords.append(positionVector.at((vertex1*3)+1));
+                   faceVertexCoords.append(positionVector.at((vertex1*3)+2));
+
+                   faceVertexCoords.append(positionVector.at(vertex2*3));
+                   faceVertexCoords.append(positionVector.at((vertex2*3)+1));
+                   faceVertexCoords.append(positionVector.at((vertex2*3)+2));
+
+                   faceVertexCoords.append(positionVector.at(vertex3*3));
+                   faceVertexCoords.append(positionVector.at((vertex3*3)+1));
+                   faceVertexCoords.append(positionVector.at((vertex3*3)+2));
+
+
+                   GLfloatVector normalVector = calculateNormals(faceVertexCoords);
+
+
+                    outStream<< "    facet normal " << QString::number(normalVector.at(0),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << "\n";
+                    outStream<< "    outer loop\n";
+                    outStream<< "    vertex " << QString::number(faceVertexCoords.at(0),'E',6) << " " << QString::number(faceVertexCoords.at(1),'E',6) << " " << QString::number(faceVertexCoords.at(2),'E',6)<<"\n";
+                    outStream<< "    vertex " << QString::number(faceVertexCoords.at(3),'E',6) << " " << QString::number(faceVertexCoords.at(4),'E',6) << " " << QString::number(faceVertexCoords.at(5),'E',6)<<"\n";
+                    outStream<< "    vertex " << QString::number(faceVertexCoords.at(6),'E',6) << " " << QString::number(faceVertexCoords.at(7),'E',6) << " " << QString::number(faceVertexCoords.at(8),'E',6)<<"\n";
+                    outStream<< "    endloop\n";
+                    outStream<< "    endfacet\n";
+
+                    doutStream<< "    facet normal " << QString::number(normalVector.at(0),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << " " << QString::number(normalVector.at(1),'E',6) << "\n";
+                    doutStream<< "    outer loop\n";
+                    doutStream<< "    vertex " << QString::number(faceVertexCoords.at(0),'E',6) << " " << QString::number(faceVertexCoords.at(1),'E',6) << " " << QString::number(faceVertexCoords.at(2),'E',6)<<"\n";
+                    doutStream<< "    vertex " << QString::number(faceVertexCoords.at(3),'E',6) << " " << QString::number(faceVertexCoords.at(4),'E',6) << " " << QString::number(faceVertexCoords.at(5),'E',6)<<"\n";
+                    doutStream<< "    vertex " << QString::number(faceVertexCoords.at(6),'E',6) << " " << QString::number(faceVertexCoords.at(7),'E',6) << " " << QString::number(faceVertexCoords.at(8),'E',6)<<"\n";
+                    doutStream<< "    endloop\n";
+                    doutStream<< "    endfacet\n";
+
+
+                }
+                outStream << "endsolid " << solidname <<"\n";
+
+                ++iMat;
+
+
+        }
+        doutStream << "endsolid " << solidname <<"\n";
+        dfile.close();
+    }
 }
 
 GLfloatVector GLC_WorldToSTL::calculateNormals(GLfloatVector NormalsVector){
