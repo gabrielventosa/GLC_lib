@@ -67,23 +67,37 @@ void GLC_WorldToSTL::exportAssemblyFromOccurence(const GLC_StructOccurence* pOcc
    }
 
 
+   if(pOccurence->hasChild())
+   {
+        const int childCount = pOccurence->childCount();
 
-    const int childCount = pOccurence->childCount();
-    for (int i=0;i < childCount; i++)
-    {
-        exportAssemblyFromOccurence(pOccurence->child(i), outStream, outFile);
-        qDebug() << "Processing child: " << pOccurence->child(i)->structReference()->name();
-        QString ChildName = pOccurence->child(i)->structReference()->name();
-        GLC_StructReference* pCurrentRef= pOccurence->child(i)->structReference();
-        if (pCurrentRef->hasRepresentation())
+        for (int i=0;i < childCount; i++)
         {
-            GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
-            solidname = pOccurence->child(i)->structReference()->name();
-            ExportRepresentation(pCurrentRep, outStream, filepath, filename+ChildName, solidname);
+            exportAssemblyFromOccurence(pOccurence->child(i), outStream, outFile);
+            qDebug() << "Processing child: " << pOccurence->child(i)->structReference()->name();
+            QString ChildName = pOccurence->child(i)->structReference()->name();
+            GLC_StructReference* pCurrentRef= pOccurence->child(i)->structReference();
+            if (pCurrentRef->hasRepresentation())
+            {
+                GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
+                solidname = pOccurence->child(i)->structReference()->name();
+                ExportRepresentation(pCurrentRep, outStream, filepath, filename+ChildName, solidname);
 
+            }
         }
     }
+   else {
+       qDebug()<<"Ocurrence has no childs";
+       GLC_StructReference* pCurrentRef= pOccurence->structReference();
+       QString ChildName = "NC";
+       if (pCurrentRef->hasRepresentation())
+           {
+               GLC_3DRep* pCurrentRep= dynamic_cast<GLC_3DRep*>(pCurrentRef->representationHandle());
+               solidname = pCurrentRef->name();
+               ExportRepresentation(pCurrentRep, outStream, filepath, filename+ChildName, solidname);
 
+           }
+   }
     return;
 }
 
